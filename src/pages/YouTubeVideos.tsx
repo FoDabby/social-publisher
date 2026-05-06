@@ -134,7 +134,7 @@ export default function YouTubeVideos() {
     return best || bestTimes[0];
   }
 
-  const scheduledPosts = posts.filter(p => p.status === "scheduled" && p.media_urls);
+  const scheduledPosts = posts.filter(p => p.status === "scheduled" && p.platforms.includes("youtube"));
 
   async function handleDeletePost(id: number) {
     if (!confirm("Remove this video from the schedule?")) return;

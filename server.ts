@@ -24,6 +24,11 @@ db.run(`
     email TEXT UNIQUE NOT NULL,
     name TEXT NOT NULL,
     plan TEXT DEFAULT 'free',
+    role TEXT DEFAULT 'user',
+    password_hash TEXT,
+    stripe_customer_id TEXT,
+    stripe_subscription_id TEXT,
+    plan_status TEXT DEFAULT 'active',
     created_at TEXT DEFAULT (datetime('now'))
   );
   CREATE TABLE IF NOT EXISTS accounts (
@@ -65,6 +70,23 @@ db.run(`
     FOREIGN KEY (post_id) REFERENCES posts(id)
   );
 `);
+
+// Add missing columns to existing tables
+try {
+  db.run("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'");
+} catch (e) {}
+try {
+  db.run("ALTER TABLE users ADD COLUMN password_hash TEXT");
+} catch (e) {}
+try {
+  db.run("ALTER TABLE users ADD COLUMN stripe_customer_id TEXT");
+} catch (e) {}
+try {
+  db.run("ALTER TABLE users ADD COLUMN stripe_subscription_id TEXT");
+} catch (e) {}
+try {
+  db.run("ALTER TABLE users ADD COLUMN plan_status TEXT DEFAULT 'active'");
+} catch (e) {}
 
 const DEMO_USER_ID = 1;
 const existingUser = db.query("SELECT id FROM users WHERE email = ?").get("demo@example.com");
@@ -453,6 +475,259 @@ app.get("/api/youtube/analytics", async (c) => {
   } catch (error) {
     console.error("YouTube analytics error:", error);
     return c.json({ error: "Failed to fetch analytics" }, 500);
+  }
+});
+
+// ===== TIER LIMITS =====
+const TIERS = {
+  free: { posts_per_month: 10, scheduled_limit: 10, platforms: ["youtube"], multi_platform: false, optimal_times: false, team_members: 1 },
+  pro: { posts_per_month: 50, scheduled_limit: 50, platforms: ["youtube", "instagram", "tiktok"], multi_platform: true, optimal_times: true, team_members: 3 },
+  business: { posts_per_month: null, scheduled_limit: null, platforms: ["youtube", "instagram", "tiktok"], multi_platform: true, optimal_times: true, team_members: 10 },
+};
+
+// ===== AUTH =====
+const JWT_SECRET = process.env.JWT_SECRET || "social-publisher-secret-key-change-in-production";
+
+function generateToken(userId: number, role: string): string {
+  const payload = { userId, role, exp: Date.now() + 7 * 24 * 60 * 60 * 1000 };
+  const base64 = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const signature = Buffer.from(`${base64}.${JWT_SECRET}`).toString("base64url");
+  return `${base64}.${signature}`;
+}
+
+function verifyToken(token: string): { userId: number; role: string } | null {
+  try {
+    const [payload] = token.split(".");
+    const decoded = JSON.parse(Buffer.from(payload, "base64url").toString());
+    if (decoded.exp < Date.now()) return null;
+    return { userId: decoded.userId, role: decoded.role };
+  } catch { return null; }
+}
+
+function hashPassword(password: string): string {
+  return Buffer.from(password).toString("base64");
+}
+
+function verifyPassword(password: string, hash: string): boolean {
+  return hashPassword(password) === hash;
+}
+
+function getCurrentUserId(c: any): number | null {
+  const auth = c.req.header("Authorization");
+  if (!auth?.startsWith("Bearer ")) return null;
+  const token = auth.slice(7);
+  const decoded = verifyToken(token);
+  return decoded?.userId || null;
+}
+
+function getTierLimits(plan: string) {
+  return TIERS[plan as keyof typeof TIERS] || TIERS.free;
+}
+
+app.post("/api/auth/signup", async (c) => {
+  const { email, password, name } = await c.req.json();
+  if (!email || !password || !name) return c.json({ error: "All fields required" }, 400);
+  const existing = db.query("SELECT id FROM users WHERE email = ?").get(email);
+  if (existing) return c.json({ error: "Email already exists" }, 400);
+  const password_hash = hashPassword(password);
+  db.run("INSERT INTO users (email, password_hash, name, plan, role) VALUES (?, ?, ?, 'free', 'user')", [email, password_hash, name]);
+  const user = db.query("SELECT id, email, name, plan, role FROM users WHERE email = ?").get(email) as any;
+  const token = generateToken(user.id, user.role);
+  return c.json({ user: { id: user.id, email: user.email, name: user.name, plan: user.plan }, token }, 201);
+});
+
+app.post("/api/auth/login", async (c) => {
+  const { email, password } = await c.req.json();
+  if (!email || !password) return c.json({ error: "Email and password required" }, 400);
+  const user = db.query("SELECT * FROM users WHERE email = ?").get(email) as any;
+  if (!user || !verifyPassword(password, user.password_hash || "")) return c.json({ error: "Invalid credentials" }, 401);
+  const token = generateToken(user.id, user.role);
+  return c.json({ user: { id: user.id, email: user.email, name: user.name, plan: user.plan, role: user.role }, token });
+});
+
+app.get("/api/auth/me", (c) => {
+  const userId = getCurrentUserId(c);
+  if (!userId) return c.json({ error: "Not authenticated" }, 401);
+  const user = db.query("SELECT id, email, name, plan, role, stripe_customer_id, created_at FROM users WHERE id = ?").get(userId) as any;
+  if (!user) return c.json({ error: "User not found" }, 404);
+  const tier = getTierLimits(user.plan);
+  const postsThisMonth = (db.query("SELECT COUNT(*) as count FROM posts WHERE user_id = ? AND created_at >= datetime('now', '-30 days')").get(userId) as any).count;
+  const scheduledCount = (db.query("SELECT COUNT(*) as count FROM posts WHERE user_id = ? AND status = 'scheduled'").get(userId) as any).count;
+  return c.json({ user, tier, usage: { posts_this_month: postsThisMonth, scheduled_count: scheduledCount } });
+});
+
+// ===== USER ACCOUNT / SETTINGS =====
+app.put("/api/user/profile", (c) => {
+  const userId = getCurrentUserId(c);
+  if (!userId) return c.json({ error: "Not authenticated" }, 401);
+  return c.json({ message: "Profile update endpoint" });
+});
+
+app.get("/api/user/usage", (c) => {
+  const userId = getCurrentUserId(c);
+  if (!userId) return c.json({ error: "Not authenticated" }, 401);
+  const user = db.query("SELECT plan FROM users WHERE id = ?").get(userId) as any;
+  const tier = getTierLimits(user.plan);
+  const postsThisMonth = (db.query("SELECT COUNT(*) as count FROM posts WHERE user_id = ? AND created_at >= datetime('now', '-30 days')").get(userId) as any).count;
+  const scheduledCount = (db.query("SELECT COUNT(*) as count FROM posts WHERE user_id = ? AND status = 'scheduled'").get(userId) as any).count;
+  return c.json({ plan: user.plan, tier, usage: { posts_this_month: postsThisMonth, scheduled_count: scheduledCount } });
+});
+
+// ===== ADMIN =====
+app.get("/api/admin/users", (c) => {
+  const userId = getCurrentUserId(c);
+  if (!userId) return c.json({ error: "Not authenticated" }, 401);
+  const currentUser = db.query("SELECT role FROM users WHERE id = ?").get(userId) as any;
+  if (currentUser?.role !== "owner") return c.json({ error: "Admin only" }, 403);
+  const users = db.query("SELECT id, email, name, plan, role, plan_status, created_at FROM users ORDER BY created_at DESC").all();
+  return c.json({ users });
+});
+
+app.put("/api/admin/users/:id/plan", async (c) => {
+  const userId = getCurrentUserId(c);
+  if (!userId) return c.json({ error: "Not authenticated" }, 401);
+  const currentUser = db.query("SELECT role FROM users WHERE id = ?").get(userId) as any;
+  if (currentUser?.role !== "owner") return c.json({ error: "Admin only" }, 403);
+  const targetId = parseInt(c.req.param("id"));
+  const { plan } = await c.req.json();
+  if (!["free", "pro", "business"].includes(plan)) return c.json({ error: "Invalid plan" }, 400);
+  db.run("UPDATE users SET plan = ? WHERE id = ?", [plan, targetId]);
+  return c.json({ success: true });
+});
+
+// ===== BILLING (STRIPE) =====
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
+
+app.get("/api/billing/plans", (c) => {
+  return c.json({ plans: [
+    { id: "free", name: "Free", price: 0, posts_per_month: 10, scheduled_limit: 10, platforms: ["youtube"], features: ["Basic scheduling", "YouTube only"] },
+    { id: "pro", name: "Pro", price: 19, posts_per_month: 50, scheduled_limit: 50, platforms: ["youtube", "instagram", "tiktok"], features: ["All platforms", "Multi-platform posts", "Optimal posting times", "3 team members"] },
+    { id: "business", name: "Business", price: 49, posts_per_month: null, scheduled_limit: null, platforms: ["youtube", "instagram", "tiktok"], features: ["Unlimited everything", "All platforms", "Priority support", "10 team members"] },
+  ]});
+});
+
+// ===== STRIPE WEBHOOK =====
+// Stripe webhook handler
+app.post("/api/billing/webhook", async (c) => {
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!stripeKey || !webhookSecret || stripeKey === "sk_live_" || webhookSecret === "whsec_placeholder") {
+    return c.json({ received: true, skipped: "not_configured" });
+  }
+
+  const body = await c.req.text();
+  const sig = c.req.header("stripe-signature");
+
+  try {
+    const crypto = await import("node:crypto");
+    const parts = (sig || "").split(",");
+    const timestampPart = parts.find(p => p.startsWith("t="));
+    const v1Part = parts.find(p => p.startsWith("v1="));
+    const timestamp = timestampPart?.substring(2) || "";
+    const v1 = v1Part?.substring(3) || "";
+    const payload = timestamp + "." + body;
+    const expected = crypto.createHmac("sha256", webhookSecret).update(payload).digest("hex");
+    if (expected !== v1) return c.json({ error: "Invalid signature" }, 400);
+
+    const event = JSON.parse(body);
+    switch (event.type) {
+      case "checkout.session.completed": {
+        const session = event.data.object;
+        const userId = parseInt(session.metadata?.user_id || "0");
+        const amount = session.amount_total || 0;
+        const plan = amount >= 4900 ? "business" : amount >= 1900 ? "pro" : "free";
+        if (userId > 0) {
+          db.run("UPDATE users SET plan = ?, stripe_customer_id = ?, subscription_id = ? WHERE id = ?",
+            [plan, session.customer, session.subscription, userId]);
+        }
+        break;
+      }
+      case "customer.subscription.deleted": {
+        const sub = event.data.object;
+        db.run("UPDATE users SET plan = 'free', subscription_id = NULL WHERE subscription_id = ?", sub.id);
+        break;
+      }
+      case "invoice.payment_failed": {
+        const inv = event.data.object;
+        db.run("UPDATE users SET plan = 'free' WHERE stripe_customer_id = ?", inv.customer);
+        break;
+      }
+    }
+    return c.json({ received: true });
+  } catch (error) {
+    console.error("Webhook error:", error);
+    return c.json({ error: "Webhook processing failed" }, 400);
+  }
+});
+
+// Stripe checkout
+app.post("/api/billing/checkout", async (c) => {
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeKey || stripeKey === "sk_live_" || stripeKey === "sk_test_") {
+    return c.json({ error: "Stripe not configured. Add your secret key in Settings." }, 400);
+  }
+
+  const { plan } = await c.req.json();
+  const priceId = plan === "pro"
+    ? (process.env.STRIPE_PRICE_PRO || "prod_UT80wu2tOD8y5o")
+    : (process.env.STRIPE_PRICE_BUSINESS || "prod_UT815owYYtLGfb");
+
+  // Get user from cookie
+  const token = c.req.cookie("auth_token");
+  let userId = 0;
+  if (token) {
+    try {
+      const parts = token.split(".");
+      if (parts.length >= 2) {
+        const payload = JSON.parse(Buffer.from(parts[1], "base64").toString());
+        userId = payload.id || 0;
+      }
+    } catch {}
+  }
+
+  if (!userId) return c.json({ error: "Not authenticated" }, 401);
+
+  try {
+    const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${stripeKey}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        mode: "subscription",
+        success_url: "https://social-publisher-mshor1216.zocomputer.io/billing?success=true&session_id={CHECKOUT_SESSION_ID}",
+        cancel_url: "https://social-publisher-mshor1216.zocomputer.io/billing?canceled=true",
+        "customer_email": "unknown@placeholder.com",
+        "line_items[0][price]": priceId,
+        "line_items[0][quantity]": "1",
+        "metadata[user_id]": userId.toString(),
+      }),
+    });
+    const session = await response.json();
+    if (session.error) return c.json({ error: session.error.message }, 400);
+    return c.json({ url: session.url, session_id: session.id });
+  } catch (error) {
+    console.error("Stripe checkout error:", error);
+    return c.json({ error: "Failed to create checkout session" }, 500);
+  }
+});
+
+app.post("/api/billing/portal", async (c) => {
+  const userId = getCurrentUserId(c);
+  if (!userId) return c.json({ error: "Not authenticated" }, 401);
+  if (!STRIPE_SECRET_KEY) return c.json({ error: "Stripe not configured" }, 500);
+  const user = db.query("SELECT stripe_customer_id FROM users WHERE id = ?").get(userId) as any;
+  if (!user?.stripe_customer_id) return c.json({ error: "No billing account" }, 400);
+  try {
+    const { default: Stripe } = await import("stripe");
+    const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2024-12-18.acacia" });
+    const session = await stripe.billingPortal.sessions.create({ customer: user.stripe_customer_id, return_url: "https://social-publisher-mshor1216.zocomputer.io/billing" });
+    return c.json({ url: session.url });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
   }
 });
 
