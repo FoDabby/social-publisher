@@ -366,6 +366,8 @@ app.post("/api/youtube/upload", async (c) => {
   }
 });
 
+// ===== YOUTUBE ANALYTICS =====
+
 app.get("/api/youtube/analytics", async (c) => {
   const account = db.query("SELECT access_token FROM accounts WHERE user_id = ? AND platform = 'youtube'").get(DEMO_USER_ID) as any;
   if (!account?.access_token) return c.json({ error: "YouTube not connected" }, 400);
