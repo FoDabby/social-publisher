@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Video, Calendar, Clock, ExternalLink, TrendingUp, ChevronRight, RefreshCw } from "lucide-react";
+import { Video, Calendar, Clock, ExternalLink, TrendingUp, ChevronRight, RefreshCw, AlertCircle, Trash2 } from "lucide-react";
 
 interface YouTubeVideo {
   id: string;
@@ -134,6 +134,14 @@ export default function YouTubeVideos() {
     return best || bestTimes[0];
   }
 
+  const scheduledPosts = posts.filter(p => p.status === "scheduled" && p.media_urls);
+
+  async function handleDeletePost(id: number) {
+    if (!confirm("Remove this video from the schedule?")) return;
+    await fetch(`/api/posts/${id}`, { method: "DELETE" });
+    fetchPosts();
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -202,6 +210,78 @@ export default function YouTubeVideos() {
                 <p className={`text-xs mt-1 ${bt.engagement === "High" ? "text-green-500" : "text-muted-foreground"}`}>{bt.engagement}</p>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Scheduled Queue Section */}
+      {scheduledPosts.length > 0 && (
+        <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-xl overflow-hidden">
+          <div className="flex items-center justify-between p-4 border-b border-amber-500/20">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-amber-500/20 rounded-lg">
+                <Clock className="h-5 w-5 text-amber-500" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold">Scheduled Upload Queue</h2>
+                <p className="text-sm text-muted-foreground">{scheduledPosts.length} video{scheduledPosts.length > 1 ? "s" : ""} scheduled</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-2xl font-bold text-amber-500">{scheduledPosts.length}</p>
+              <p className="text-xs text-muted-foreground">pending</p>
+            </div>
+          </div>
+          <div className="divide-y">
+            {scheduledPosts.map((post) => {
+              const media = JSON.parse(post.media_urls || "[]")[0];
+              const scheduledDate = post.scheduled_at ? new Date(post.scheduled_at) : null;
+              const isPast = scheduledDate && scheduledDate < new Date();
+              return (
+                <div key={post.id} className="p-4 flex items-center gap-4 hover:bg-muted/30 transition">
+                  {/* Thumbnail */}
+                  <div className="w-24 h-16 bg-muted rounded-lg overflow-hidden flex-shrink-0">
+                    {media?.thumbnail ? (
+                      <img src={media.thumbnail} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Video className="h-6 w-6 text-muted-foreground/50" />
+                      </div>
+                    )}
+                  </div>
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium truncate">{media?.title || "Video Post"}</p>
+                      <span className="px-2 py-0.5 bg-red-500/20 text-red-600 rounded text-xs flex-shrink-0">YouTube</span>
+                    </div>
+                    <div className="flex items-center gap-3 mt-1">
+                      <p className={`text-sm ${isPast ? "text-amber-500 font-medium" : "text-muted-foreground"}`}>
+                        {scheduledDate ? (
+                          <>
+                            <Clock className="h-3 w-3 inline mr-1" />
+                            {scheduledDate.toLocaleString()}
+                          </>
+                        ) : "Not scheduled"}
+                      </p>
+                      {isPast && (
+                        <span className="text-xs text-amber-500 bg-amber-500/20 px-2 py-0.5 rounded">Overdue</span>
+                      )}
+                    </div>
+                  </div>
+                  {/* Actions */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleDeletePost(post.id)}
+                      className="p-2 text-rose-500 hover:bg-rose-500/10 rounded-lg transition"
+                      title="Remove from schedule"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
