@@ -123,7 +123,7 @@ if (postCount.count === 0) {
       [publishedPost.id, "instagram", 3200, 280, 42, 28, 8500, 12000]
     );
     db.run(
-      "INSERT INTO analytics (post_id, platform, views, likes, comments, shares, reach, impressions) VALUES (?, ?, ?, ?, ?, ?)",
+      "INSERT INTO analytics (post_id, platform, views, likes, comments, shares, reach, impressions) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
       [publishedPost.id, "tiktok", 12500, 890, 156, 210, 25000, 35000]
     );
   }
