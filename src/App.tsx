@@ -5,6 +5,7 @@ import Posts from "./pages/Posts";
 import Calendar from "./pages/Calendar";
 import Analytics from "./pages/Analytics";
 import Accounts from "./pages/Accounts";
+import YouTubeVideos from "./pages/YouTubeVideos";
 import Sidebar from "./components/Sidebar";
 
 function Layout({ children }: { children: React.ReactNode }) {
@@ -28,6 +29,7 @@ export default function App() {
           <Route path="/calendar" element={<Layout><Calendar /></Layout>} />
           <Route path="/analytics" element={<Layout><Analytics /></Layout>} />
           <Route path="/accounts" element={<Layout><Accounts /></Layout>} />
+          <Route path="/youtube-videos" element={<Layout><YouTubeVideos /></Layout>} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>

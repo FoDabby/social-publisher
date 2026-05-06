@@ -1,10 +1,11 @@
 import { NavLink } from "react-router-dom";
-import { BarChart3, FileText, Calendar, TrendingUp, Users } from "lucide-react";
+import { BarChart3, FileText, Calendar, TrendingUp, Users, Video } from "lucide-react";
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: BarChart3 },
   { path: "/posts", label: "Posts", icon: FileText },
   { path: "/calendar", label: "Calendar", icon: Calendar },
+  { path: "/youtube-videos", label: "YouTube Videos", icon: Video },
   { path: "/analytics", label: "Analytics", icon: TrendingUp },
   { path: "/accounts", label: "Accounts", icon: Users },
 ];

@@ -9,7 +9,10 @@
     "published_port": 52853,
     "env": {
       "NODE_ENV": "production",
-      "ZO_CLIENT_IDENTITY_TOKEN": "none"
+      "ZO_CLIENT_IDENTITY_TOKEN": "none",
+      "YOUTUBE_CLIENT_ID": "YOUTUBE_CLIENT_ID_PLACEHOLDER",
+      "YOUTUBE_CLIENT_SECRET": "YOUTUBE_CLIENT_SECRET_PLACEHOLDER"
     }
-  }
+  },
+  "env": {}
 }
