@@ -179,64 +179,132 @@ app.get("/api/auth/youtube/callback", async (c) => {
   }
 });
 
+// ===== YOUTUBE TOKEN REFRESH =====
+
+async function getValidYouTubeToken(): Promise<string | null> {
+  const account = db.query("SELECT access_token, refresh_token, expires_at FROM accounts WHERE user_id = ? AND platform = 'youtube' AND is_active = 1").get(DEMO_USER_ID) as any;
+  if (!account) return null;
+  
+  // Handle both raw string tokens and JSON stringified tokens
+  const rawToken = account.access_token;
+  let tokens: any;
+  try {
+    tokens = typeof rawToken === 'string' && rawToken.startsWith('{') ? JSON.parse(rawToken) : { access_token: rawToken, refresh_token: account.refresh_token, expiry_date: account.expires_at ? Date.parse(account.expires_at) : null };
+  } catch {
+    tokens = { access_token: rawToken, refresh_token: account.refresh_token, expiry_date: account.expires_at ? Date.parse(account.expires_at) : null };
+  }
+  
+  const now = Date.now();
+  const isExpired = tokens.expiry_date && tokens.expiry_date < now;
+  
+  // If expired or about to expire, refresh
+  if (tokens.refresh_token && (!tokens.expiry_date || isExpired)) {
+    try {
+      const response = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          client_id: YOUTUBE_CLIENT_ID,
+          client_secret: YOUTUBE_CLIENT_SECRET,
+          refresh_token: tokens.refresh_token,
+          grant_type: "refresh_token",
+        }),
+      });
+      
+      if (response.ok) {
+        const newTokens = await response.json() as any;
+        const updated = {
+          access_token: newTokens.access_token,
+          refresh_token: tokens.refresh_token, // keep same refresh token
+          expiry_date: Date.now() + (newTokens.expires_in * 1000),
+        };
+        
+        // Save refreshed token - store as raw string to match OAuth format
+        db.run("UPDATE accounts SET access_token = ?, expires_at = ? WHERE user_id = ? AND platform = 'youtube'", 
+          [newTokens.access_token, new Date(updated.expiry_date).toISOString(), DEMO_USER_ID]);
+        
+        return updated.access_token;
+      }
+    } catch (e) {
+      console.error("Token refresh failed:", e);
+    }
+    return null;
+  }
+  
+  return tokens.access_token || null;
+}
+
 // ===== YOUTUBE VIDEO MANAGEMENT =====
 
 app.get("/api/youtube/videos", async (c) => {
-  const account = db.query("SELECT access_token FROM accounts WHERE user_id = ? AND platform = 'youtube'").get(DEMO_USER_ID) as any;
-  if (!account?.access_token) return c.json({ error: "YouTube not connected" }, 400);
-
-  // Handle both raw string tokens and JSON stringified tokens
-  const rawToken = account.access_token;
-  let accessToken: string;
-  if (rawToken.startsWith("ya29")) {
-    accessToken = rawToken;
-  } else {
-    const token = JSON.parse(rawToken);
-    accessToken = token.access_token;
-    if (token.expiry_date && Date.now() > token.expiry_date) {
-      return c.json({ error: "YouTube token expired. Please reconnect.", expired: true }, 401);
-    }
-  }
+  const accessToken = await getValidYouTubeToken();
+  if (!accessToken) return c.json({ error: "No YouTube access" }, 401);
 
   try {
-    // Fetch uploads playlist (my channel)
-    const channelRes = await fetch(
-      "https://www.googleapis.com/youtube/v3/channels?part=contentDetails&mine=true",
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    const channelData = await channelRes.json();
-    if (channelData.error) return c.json({ error: channelData.error.message }, 400);
-
-    const uploadsPlaylistId = channelData.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
-    if (!uploadsPlaylistId) return c.json({ error: "No uploads playlist found" }, 404);
-
-    // Fetch videos from uploads playlist
-    const videosRes = await fetch(
-      `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=${uploadsPlaylistId}&maxResults=50&pageToken=${c.req.query("pageToken") || ""}`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    const videosData = await videosRes.json();
-    if (videosData.error) return c.json({ error: videosData.error.message }, 400);
-
-    const videos = videosData.items?.map((item: any) => ({
-      id: item.contentDetails?.videoId,
-      title: item.snippet?.title,
-      description: item.snippet?.description,
-      thumbnail: item.snippet?.thumbnails?.medium?.url,
-      publishedAt: item.snippet?.publishedAt,
-      videoUrl: `https://www.youtube.com/watch?v=${item.contentDetails?.videoId}`,
-      duration: item.contentDetails?.duration,
-      viewCount: item.contentDetails?.definition === "hd" ? "HD" : "SD",
-    })) || [];
-
-    return c.json({
-      videos,
-      nextPageToken: videosData.nextPageToken,
-      totalResults: videosData.pageInfo?.totalResults,
+    // Get uploads playlist from channel
+    const channelRes = await fetch("https://www.googleapis.com/youtube/v3/channels?part=contentDetails&mine=true", {
+      headers: { "Authorization": `Bearer ${accessToken}` }
     });
+    
+    if (!channelRes.ok) {
+      const err = await channelRes.text();
+      console.error("Channel fetch error:", err);
+      return c.json({ error: "Failed to fetch channel" }, 400);
+    }
+    
+    const channelData = await channelRes.json();
+    const uploadsPlaylistId = channelData.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
+    
+    if (!uploadsPlaylistId) return c.json({ videos: [], message: "No uploads found" });
+    
+    // Fetch ALL videos with pagination
+    const allVideos: any[] = [];
+    let nextPageToken: string | undefined = undefined;
+    
+    do {
+      const playlistParams = new URLSearchParams({
+        part: "snippet,contentDetails,status",
+        playlistId: uploadsPlaylistId,
+        maxResults: "50",
+      });
+      if (nextPageToken) playlistParams.set("pageToken", nextPageToken);
+      
+      const playlistRes = await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?${playlistParams}`, {
+        headers: { "Authorization": `Bearer ${accessToken}` }
+      });
+      
+      if (!playlistRes.ok) break;
+      
+      const playlistData = await playlistRes.json();
+      
+      if (playlistData.items) {
+        for (const item of playlistData.items) {
+          if (item.snippet.title === "Private" || item.snippet.title === "Deleted") continue;
+          
+          const videoId = item.snippet.resourceId?.videoId;
+          if (!videoId) continue;
+          
+          allVideos.push({
+            id: videoId,
+            title: item.snippet.title,
+            description: item.snippet.description,
+            thumbnail: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.medium?.url || item.snippet.thumbnails?.default?.url || null,
+            publishedAt: item.snippet.publishedAt,
+            videoUrl: `https://www.youtube.com/watch?v=${videoId}`,
+            duration: item.contentDetails?.duration || null,
+            viewCount: "N/A",
+            privacyStatus: item.status?.privacyStatus || "public",
+          });
+        }
+      }
+      
+      nextPageToken = playlistData.nextPageToken;
+    } while (nextPageToken && allVideos.length < 200); // Cap at 200 videos
+    
+    return c.json({ videos: allVideos, total: allVideos.length });
   } catch (error) {
-    console.error("YouTube videos fetch error:", error);
-    return c.json({ error: "Failed to fetch YouTube videos" }, 500);
+    console.error("YouTube videos error:", error);
+    return c.json({ error: "Failed to fetch videos" }, 500);
   }
 });
 
