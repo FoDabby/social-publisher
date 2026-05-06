@@ -3,19 +3,21 @@ import type { ViteDevServer } from "vite";
 import { createServer as createViteServer } from "vite";
 import config from "./zosite.json";
 import { Hono } from "hono";
+import api from "./src/pages/api";
 
 // AI agents: read README.md for navigation and contribution guidance.
 type Mode = "development" | "production";
 const app = new Hono();
-
 const mode: Mode =
   process.env.NODE_ENV === "production" ? "production" : "development";
+
+// Mount API routes
+app.route("/api", api);
 
 /**
  * Add any API routes here.
  */
 app.get("/api/hello-zo", (c) => c.json({ msg: "Hello from Zo" }));
-
 if (mode === "production") {
   configureProduction(app);
 } else {
@@ -32,9 +34,7 @@ const port = process.env.PORT
   : mode === "production"
     ? (config.publish?.published_port ?? config.local_port)
     : config.local_port;
-
 export default { fetch: app.fetch, port, idleTimeout: 255 };
-
 /**
  * Configure routing for production builds.
  *
