@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Edit2, Trash2, Send, Clock, X } from "lucide-react";
+import { Plus, Edit2, Trash2, Send, Clock, X, Menu, Upload, Image, Film } from "lucide-react";
 
 interface Post {
   id: number;
@@ -20,6 +20,9 @@ export default function Posts() {
     platforms: [] as string[],
     scheduled_at: "",
   });
+  const [mediaFiles, setMediaFiles] = useState<FileList | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [mediaPreviews, setMediaPreviews] = useState<string[]>([]);
 
   useEffect(() => {
     fetchPosts();
@@ -88,6 +91,18 @@ export default function Posts() {
     if (!confirm(`Publish this post to ${post.platforms}?`)) return;
     await fetch(`/api/posts/${post.id}/publish`, { method: "POST" });
     fetchPosts();
+  }
+
+  function handleMediaChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (files) {
+      setMediaFiles(files);
+      const previews: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        previews.push(URL.createObjectURL(files[i]));
+      }
+      setMediaPreviews(previews);
+    }
   }
 
   const platforms = ["youtube", "instagram", "tiktok"];
@@ -232,6 +247,57 @@ export default function Posts() {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Media Upload */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  <span className="flex items-center gap-2">
+                    <Image className="h-4 w-4" /> Photos / Videos
+                  </span>
+                </label>
+                <div className="border-2 border-dashed border-muted rounded-lg p-4 text-center">
+                  <input
+                    type="file"
+                    id="media-upload"
+                    multiple
+                    accept="image/*,video/*"
+                    onChange={handleMediaChange}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor="media-upload"
+                    className="cursor-pointer flex flex-col items-center gap-2"
+                  >
+                    <Upload className="h-8 w-8 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">
+                      Tap to select photos or videos
+                    </span>
+                    <span className="text-xs text-muted-foreground/70">
+                      Images & videos from your device
+                    </span>
+                  </label>
+                </div>
+                {mediaPreviews.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {mediaPreviews.map((src, i) => (
+                      <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden bg-muted">
+                        <img src={src} alt="" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newPreviews = [...mediaPreviews];
+                            newPreviews.splice(i, 1);
+                            setMediaPreviews(newPreviews);
+                          }}
+                          className="absolute top-0 right-0 p-1 bg-black/60 rounded-bl text-white text-xs"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div>

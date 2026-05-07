@@ -9,14 +9,7 @@
     "published_port": 52853,
     "env": {
       "NODE_ENV": "production",
-      "ZO_CLIENT_IDENTITY_TOKEN": "none",
-      "YOUTUBE_CLIENT_ID": "YOUTUBE_CLIENT_ID_PLACEHOLDER",
-      "YOUTUBE_CLIENT_SECRET": "YOUTUBE_CLIENT_SECRET_PLACEHOLDER",
-      "JWT_SECRET": "sp-live-secret-",
-      "STRIPE_SECRET_KEY": "sk_live_",
-      "STRIPE_PRICE_PRO": "prod_UT80wu2tOD8y5o",
-      "STRIPE_PRICE_BUSINESS": "prod_UT815owYYtLGfb",
-      "STRIPE_WEBHOOK_SECRET": "whsec_placeholder"
+      "ZO_CLIENT_IDENTITY_TOKEN": "none"
     }
   },
   "env": {}

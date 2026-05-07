@@ -671,11 +671,12 @@ app.post("/api/billing/checkout", async (c) => {
 
   const { plan } = await c.req.json();
   const priceId = plan === "pro"
-    ? (process.env.STRIPE_PRICE_PRO || "prod_UT80wu2tOD8y5o")
-    : (process.env.STRIPE_PRICE_BUSINESS || "prod_UT815owYYtLGfb");
+    ? (process.env.STRIPE_PRICE_PRO || "price_1TUBthLwz6z5MtpXjNGJrIDE")
+    : (process.env.STRIPE_PRICE_BUSINESS || "price_1TUBtgLwz6z5MtpXjA2f7bG4");
 
   // Get user from cookie
-  const token = c.req.cookie("auth_token");
+  const authHeader = c.req.header("Authorization");
+  const token = authHeader ? authHeader.replace("Bearer ", "") : c.req.cookie?.("auth_token") || "";
   let userId = 0;
   if (token) {
     try {
