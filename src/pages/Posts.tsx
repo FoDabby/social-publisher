@@ -19,10 +19,12 @@ export default function Posts() {
     content: "",
     platforms: [] as string[],
     scheduled_at: "",
+    media_urls: [] as string[],
   });
   const [mediaFiles, setMediaFiles] = useState<FileList | null>(null);
   const [uploading, setUploading] = useState(false);
   const [mediaPreviews, setMediaPreviews] = useState<string[]>([]);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
 
   useEffect(() => {
     fetchPosts();
@@ -36,16 +38,20 @@ export default function Posts() {
 
   function openCreate() {
     setEditingPost(null);
-    setFormData({ content: "", platforms: [], scheduled_at: "" });
+    setFormData({ content: "", platforms: [], scheduled_at: "", media_urls: [] });
+    setMediaPreviews([]);
     setShowModal(true);
   }
 
   function openEdit(post: Post) {
     setEditingPost(post);
+    const urls = post.media_urls ? JSON.parse(post.media_urls) : [];
+    setMediaPreviews(urls.map((u: string) => u.startsWith("/") ? u : u));
     setFormData({
       content: post.content,
       platforms: post.platforms.split(",").map((p) => p.trim()),
       scheduled_at: post.scheduled_at ? post.scheduled_at.slice(0, 16) : "",
+      media_urls: urls,
     });
     setShowModal(true);
   }
@@ -61,6 +67,7 @@ export default function Posts() {
       content: formData.content,
       platforms: formData.platforms.join(","),
       scheduled_at: formData.scheduled_at || null,
+      media_urls: formData.media_urls.length > 0 ? JSON.stringify(formData.media_urls) : null,
     };
 
     if (editingPost) {
@@ -93,15 +100,23 @@ export default function Posts() {
     fetchPosts();
   }
 
-  function handleMediaChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files;
-    if (files) {
-      setMediaFiles(files);
-      const previews: string[] = [];
-      for (let i = 0; i < files.length; i++) {
-        previews.push(URL.createObjectURL(files[i]));
+  async function handleMediaChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    setUploadingMedia(true);
+    try {
+      const uploaded = [];
+      for (const file of files) {
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await fetch("/api/media/upload", { method: "POST", body: fd });
+        const data = await res.json();
+        if (data.url) uploaded.push(data.url);
       }
-      setMediaPreviews(previews);
+      setFormData(prev => ({ ...prev, media_urls: [...prev.media_urls, ...uploaded] }));
+      setMediaPreviews(prev => [...prev, ...uploaded]);
+    } finally {
+      setUploadingMedia(false);
     }
   }
 
@@ -287,7 +302,8 @@ export default function Posts() {
                           type="button"
                           onClick={() => {
                             const newPreviews = [...mediaPreviews];
-                            newPreviews.splice(i, 1);
+                            const removed = newPreviews.splice(i, 1)[0];
+                            setFormData(prev => ({ ...prev, media_urls: prev.media_urls.filter(u => u !== removed) }));
                             setMediaPreviews(newPreviews);
                           }}
                           className="absolute top-0 right-0 p-1 bg-black/60 rounded-bl text-white text-xs"

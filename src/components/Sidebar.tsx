@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { BarChart3, FileText, Calendar, TrendingUp, Users, Video, LogOut } from "lucide-react";
+import { BarChart3, FileText, Calendar, TrendingUp, Users, Video, Menu, X, LogOut } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface User {

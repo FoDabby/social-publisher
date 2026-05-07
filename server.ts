@@ -15,6 +15,8 @@ const mode: Mode =
 // ===== DATABASE =====
 const DATA_DIR = "./data";
 await mkdir(DATA_DIR, { recursive: true });
+const UPLOAD_DIR = "./data/uploads";
+await mkdir(UPLOAD_DIR, { recursive: true });
 const db = new Database(`${DATA_DIR}/social-publisher.db`);
 db.run("PRAGMA foreign_keys = ON");
 
@@ -732,6 +734,34 @@ app.post("/api/billing/portal", async (c) => {
   }
 });
 
+
+
+// ===== MEDIA UPLOAD =====
+app.post("/api/media/upload", async (c) => {
+  const uploadDir = "./data/uploads";
+  try {
+    const formData = await c.req.parseBody();
+    const file = formData["file"] as File | undefined;
+    if (!file) return c.json({ error: "No file provided" }, 400);
+    const ext = file.name.split(".").pop() || "bin";
+    const timestamp = Date.now();
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const filename = `${timestamp}-${safeName}`;
+    const filepath = `${uploadDir}/${filename}`;
+    const buffer = await file.arrayBuffer();
+    await Bun.write(filepath, buffer);
+    const url = `/api/media/${filename}`;
+    return c.json({ url, filename, size: buffer.byteLength, type: file.type }, 201);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+app.get("/api/media/:filename", async (c) => {
+  const filename = c.req.param("filename").replace(/[^a-zA-Z0-9._-]/g, "");
+  const file = Bun.file(`./data/uploads/${filename}`);
+  if (!(await file.exists())) return c.json({ error: "File not found" }, 404);
+  return new Response(file);
+});
 // ===== API ROUTES =====
 
 app.get("/api/debug/env", (c) => {
