@@ -97,8 +97,8 @@ if (!existingUser) {
 
 
 // YouTube OAuth Configuration
-const YOUTUBE_CLIENT_ID = process.env.YOUTUBE_CLIENT_ID || "YOUTUBE_CLIENT_ID_PLACEHOLDER";
-const YOUTUBE_CLIENT_SECRET = process.env.YOUTUBE_CLIENT_SECRET || "YOUTUBE_CLIENT_SECRET_PLACEHOLDER";
+const YOUTUBE_CLIENT_ID = process.env.YOUTUBE_CLIENT_ID || "";
+const YOUTUBE_CLIENT_SECRET = process.env.YOUTUBE_CLIENT_SECRET || "";
 const YOUTUBE_REDIRECT_URI = mode === "production"
   ? "https://social-publisher-mshor1216.zocomputer.io/api/auth/youtube/callback"
   : "http://localhost:53890/api/auth/youtube/callback";
