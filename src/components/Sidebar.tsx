@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { BarChart3, FileText, Calendar, TrendingUp, Users, Video, LogOut, User } from "lucide-react";
+import { BarChart3, FileText, Calendar, TrendingUp, Users, Video, LogOut, User, Settings as SettingsIcon, CreditCard } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface UserData {
@@ -16,6 +16,8 @@ const navItems = [
   { path: "/analytics", label: "Analytics", icon: TrendingUp },
   { path: "/accounts", label: "Accounts", icon: Users },
   { path: "/youtube-videos", label: "YouTube", icon: Video },
+  { path: "/settings", label: "Settings", icon: SettingsIcon },
+  { path: "/billing", label: "Billing", icon: CreditCard },
 ];
 
 export default function Sidebar() {
