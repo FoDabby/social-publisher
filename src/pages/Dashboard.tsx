@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { apiFetch } from "@/lib/api";
 import { BarChart3, Calendar, FileText, Users, Clock, TrendingUp, Eye, Heart, Share2, MessageSquare } from "lucide-react";
 
 interface DashboardData {
@@ -32,8 +33,8 @@ export default function Dashboard() {
   useEffect(() => {
     async function fetchData() {
       const [postsRes, analyticsRes] = await Promise.all([
-        fetch("/api/posts"),
-        fetch("/api/analytics?period=30d"),
+        apiFetch("/api/posts"),
+        apiFetch("/api/analytics?period=30d"),
       ]);
       const posts = await postsRes.json();
       const analytics = await analyticsRes.json();

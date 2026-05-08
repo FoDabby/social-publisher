@@ -9,12 +9,13 @@ import YouTubeVideos from "./pages/YouTubeVideos";
 import Auth from "./pages/Auth";
 import Billing from "./pages/Billing";
 import Settings from "./pages/Settings";
+import Studio from "./pages/Studio";
 import Sidebar from "./components/Sidebar";
 import Landing from "./pages/Landing";
 
 function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
       <main className="flex-1 p-8 overflow-auto">
         {children}
@@ -37,15 +38,16 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/auth" element={<Auth />} />
-          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-          <Route path="/billing" element={<Billing />} />
           <Route path="/" element={<Landing />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/studio" element={<ProtectedRoute><Studio /></ProtectedRoute>} />
           <Route path="/posts" element={<ProtectedRoute><Posts /></ProtectedRoute>} />
           <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
           <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
           <Route path="/accounts" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
           <Route path="/youtube-videos" element={<ProtectedRoute><YouTubeVideos /></ProtectedRoute>} />
+          <Route path="/billing" element={<ProtectedRoute><Billing /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>

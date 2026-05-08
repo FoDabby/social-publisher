@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { apiFetch } from "@/lib/api";
 import { User, Lock, CheckCircle, AlertCircle } from "lucide-react";
 
 export default function Settings() {
@@ -33,7 +34,7 @@ export default function Settings() {
     setMessage(null);
 
     try {
-      const res = await fetch("/api/settings/change-password", {
+      const res = await apiFetch("/api/settings/change-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ currentPassword, newPassword }),

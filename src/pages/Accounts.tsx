@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { apiFetch } from "@/lib/api";
 import { Plus, Trash2, ExternalLink, Check } from "lucide-react";
 
 interface Account {
@@ -20,7 +21,7 @@ export default function Accounts() {
   }, []);
 
   async function fetchAccounts() {
-    const res = await fetch("/api/accounts");
+    const res = await apiFetch("/api/accounts");
     const data = await res.json();
     setAccounts(data.accounts || []);
   }
@@ -28,7 +29,7 @@ export default function Accounts() {
   async function connectAccount() {
     if (!selectedPlatform) return;
     
-    const res = await fetch("/api/accounts", {
+    const res = await apiFetch("/api/accounts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ platform: selectedPlatform, username: `@demo_${selectedPlatform}` }),
@@ -46,7 +47,7 @@ export default function Accounts() {
 
   async function disconnectAccount(id: number) {
     if (!confirm("Disconnect this account?")) return;
-    await fetch(`/api/accounts/${id}`, { method: "DELETE" });
+    await apiFetch(`/api/accounts/${id}`, { method: "DELETE" });
     fetchAccounts();
   }
 

@@ -90,49 +90,28 @@ try {
   db.run("ALTER TABLE users ADD COLUMN plan_status TEXT DEFAULT 'active'");
 } catch (e) {}
 
-const DEMO_USER_ID = 1;
 const existingUser = db.query("SELECT id FROM users WHERE email = ?").get("demo@example.com");
 if (!existingUser) {
   db.run("INSERT INTO users (email, name, plan) VALUES (?, ?, ?)", ["demo@example.com", "Demo User", "free"]);
 }
 
-const accountCount = (db.query("SELECT COUNT(*) as count FROM accounts WHERE user_id = ?").get(DEMO_USER_ID) as { count: number }).count;
-if (accountCount === 0) {
-  db.run("INSERT INTO accounts (user_id, platform, username, is_active) VALUES (?, ?, ?, ?)", [DEMO_USER_ID, "youtube", "@demouser", 1]);
-  db.run("INSERT INTO accounts (user_id, platform, username, is_active) VALUES (?, ?, ?, ?)", [DEMO_USER_ID, "instagram", "@demouser", 1]);
-  db.run("INSERT INTO accounts (user_id, platform, username, is_active) VALUES (?, ?, ?, ?)", [DEMO_USER_ID, "tiktok", "@demouser", 1]);
-}
 
-const postCount = (db.query("SELECT COUNT(*) as count FROM posts WHERE user_id = ?").get(DEMO_USER_ID) as { count: number }).count;
-if (postCount === 0) {
-  db.run("INSERT INTO posts (user_id, content, platforms, status) VALUES (?, ?, ?, ?)", [DEMO_USER_ID, "Check out these amazing AI tools that can transform your workflow! 🚀 #AI #Productivity", "youtube,instagram,tiktok", "draft"]);
-  db.run("INSERT INTO posts (user_id, content, platforms, status, scheduled_at) VALUES (?, ?, ?, ?, ?)", [DEMO_USER_ID, "New video! 5 FREE AI Tools That Do $1,000 Worth of Work 💰", "youtube,instagram,tiktok", "scheduled", "2026-05-10 09:00:00"]);
-  db.run("INSERT INTO posts (user_id, content, platforms, status, scheduled_at) VALUES (?, ?, ?, ?, ?)", [DEMO_USER_ID, "Quick tip: Use Claude for brainstorming, ChatGPT for writing, and Gemini for research 🤖", "youtube,tiktok", "scheduled", "2026-05-15 14:00:00"]);
-  db.run("INSERT INTO posts (user_id, content, platforms, status, published_at) VALUES (?, ?, ?, ?, ?)", [DEMO_USER_ID, "Just launched! My complete guide to AI agents in 2026 🚀", "youtube,instagram,tiktok", "published", "2026-05-01 10:00:00"]);
-  const publishedPost = db.query("SELECT id FROM posts WHERE user_id = ? AND status = 'published'").get(DEMO_USER_ID) as { id: number };
-  if (publishedPost) {
-    db.run("INSERT INTO analytics (post_id, platform, views, likes, comments, shares, reach, impressions) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", [publishedPost.id, "youtube", 5420, 342, 87, 45, 12000, 18000]);
-    db.run("INSERT INTO analytics (post_id, platform, views, likes, comments, shares, reach, impressions) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", [publishedPost.id, "instagram", 3200, 280, 42, 28, 8500, 12000]);
-    db.run("INSERT INTO analytics (post_id, platform, views, likes, comments, shares, reach, impressions) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", [publishedPost.id, "tiktok", 12500, 890, 156, 210, 25000, 35000]);
-  }
-}
-
+// YouTube OAuth Configuration
 const YOUTUBE_CLIENT_ID = process.env.YOUTUBE_CLIENT_ID || "YOUTUBE_CLIENT_ID_PLACEHOLDER";
 const YOUTUBE_CLIENT_SECRET = process.env.YOUTUBE_CLIENT_SECRET || "YOUTUBE_CLIENT_SECRET_PLACEHOLDER";
 const YOUTUBE_REDIRECT_URI = mode === "production"
-  ? `https://social-publisher-mshor1216.zocomputer.io/api/auth/youtube/callback`
-  : `http://localhost:53890/api/auth/youtube/callback`;
-const SCOPES = [
-  "https://www.googleapis.com/auth/youtube.upload",
-  "https://www.googleapis.com/auth/youtube.readonly",
-  "https://www.googleapis.com/auth/userinfo.profile",
-  "https://www.googleapis.com/auth/userinfo.email",
-].join(" ");
+  ? "https://social-publisher-mshor1216.zocomputer.io/api/auth/youtube/callback"
+  : "http://localhost:53890/api/auth/youtube/callback";
+const SCOPES = "https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email";
 
 // ===== YOUTUBE OAUTH =====
 
 app.get("/api/auth/youtube", (c) => {
-  const state = Math.random().toString(36).substring(7);
+  // Require login - get userId from cookie
+  const userId = getCurrentUserId(c);
+  if (!userId) return c.redirect("/auth?next=/api/auth/youtube");
+  // Set userId in OAuth state so callback knows which user
+  const state = `${userId}_${Math.random().toString(36).substring(7)}`;
   const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
     `client_id=${encodeURIComponent(YOUTUBE_CLIENT_ID)}` +
     `&redirect_uri=${encodeURIComponent(YOUTUBE_REDIRECT_URI)}` +
@@ -146,7 +125,12 @@ app.get("/api/auth/youtube", (c) => {
 
 app.get("/api/auth/youtube/callback", async (c) => {
   const code = c.req.query("code");
+  const state = c.req.query("state") || "";
   if (!code) return c.json({ error: "No code provided" }, 400);
+  
+  // Extract userId from state (format: "userId_random")
+  const userId = parseInt(state.split("_")[0]);
+  if (!userId) return c.json({ error: "Invalid state - please log in first" }, 400);
 
   try {
     // Exchange code for tokens
@@ -186,13 +170,13 @@ app.get("/api/auth/youtube/callback", async (c) => {
     const profileImage = channel?.thumbnails?.default?.url || userInfo.picture || null;
 
     // Update or insert YouTube account
-    const existing = db.query("SELECT id FROM accounts WHERE user_id = ? AND platform = 'youtube'").get(DEMO_USER_ID);
+    const existing = db.query("SELECT id FROM accounts WHERE user_id = ? AND platform = 'youtube'").get(userId);
     if (existing) {
       db.run("UPDATE accounts SET username = ?, access_token = ?, refresh_token = ?, expires_at = ?, profile_image = ?, is_active = 1 WHERE user_id = ? AND platform = 'youtube'",
-        [channelTitle, tokens.access_token, tokens.refresh_token, tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : null, profileImage, DEMO_USER_ID]);
+        [channelTitle, tokens.access_token, tokens.refresh_token, tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : null, profileImage, userId]);
     } else {
       db.run("INSERT INTO accounts (user_id, platform, username, access_token, refresh_token, expires_at, profile_image, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, 1)",
-        [DEMO_USER_ID, "youtube", channelTitle, tokens.access_token, tokens.refresh_token, tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : null, profileImage]);
+        [userId, "youtube", channelTitle, tokens.access_token, tokens.refresh_token, tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : null, profileImage]);
     }
 
     // Return success HTML
@@ -205,8 +189,8 @@ app.get("/api/auth/youtube/callback", async (c) => {
 
 // ===== YOUTUBE TOKEN REFRESH =====
 
-async function getValidYouTubeToken(): Promise<string | null> {
-  const account = db.query("SELECT access_token, refresh_token, expires_at FROM accounts WHERE user_id = ? AND platform = 'youtube' AND is_active = 1").get(DEMO_USER_ID) as any;
+async function getValidYouTubeToken(userId: number): Promise<string | null> {
+  const account = db.query("SELECT access_token, refresh_token, expires_at FROM accounts WHERE user_id = ? AND platform = 'youtube' AND is_active = 1").get(userId) as any;
   if (!account) return null;
   
   // Handle both raw string tokens and JSON stringified tokens
@@ -245,7 +229,7 @@ async function getValidYouTubeToken(): Promise<string | null> {
         
         // Save refreshed token - store as raw string to match OAuth format
         db.run("UPDATE accounts SET access_token = ?, expires_at = ? WHERE user_id = ? AND platform = 'youtube'", 
-          [newTokens.access_token, new Date(updated.expiry_date).toISOString(), DEMO_USER_ID]);
+          [newTokens.access_token, new Date(updated.expiry_date).toISOString(), userId]);
         
         return updated.access_token;
       }
@@ -261,7 +245,9 @@ async function getValidYouTubeToken(): Promise<string | null> {
 // ===== YOUTUBE VIDEO MANAGEMENT =====
 
 app.get("/api/youtube/videos", async (c) => {
-  const accessToken = await getValidYouTubeToken();
+  const userId = getCurrentUserId(c);
+  if (!userId) return c.json({ error: "Not authenticated" }, 401);
+  const accessToken = await getValidYouTubeToken(userId);
   if (!accessToken) return c.json({ error: "No YouTube access" }, 401);
 
   try {
@@ -333,7 +319,9 @@ app.get("/api/youtube/videos", async (c) => {
 });
 
 app.post("/api/youtube/upload", async (c) => {
-  const account = db.query("SELECT access_token FROM accounts WHERE user_id = ? AND platform = 'youtube'").get(DEMO_USER_ID) as any;
+  const userId = getCurrentUserId(c);
+  if (!userId) return c.json({ error: "Not authenticated" }, 401);
+  const account = db.query("SELECT access_token FROM accounts WHERE user_id = ? AND platform = 'youtube'").get(userId) as any;
   if (!account?.access_token) return c.json({ error: "YouTube not connected" }, 400);
 
   // Handle both raw string tokens and JSON stringified tokens
@@ -393,7 +381,9 @@ app.post("/api/youtube/upload", async (c) => {
 // ===== YOUTUBE ANALYTICS =====
 
 app.get("/api/youtube/analytics", async (c) => {
-  const account = db.query("SELECT access_token FROM accounts WHERE user_id = ? AND platform = 'youtube'").get(DEMO_USER_ID) as any;
+  const userId = getCurrentUserId(c);
+  if (!userId) return c.json({ error: "Not authenticated" }, 401);
+  const account = db.query("SELECT access_token FROM accounts WHERE user_id = ? AND platform = 'youtube'").get(userId) as any;
   if (!account?.access_token) return c.json({ error: "YouTube not connected" }, 400);
 
   // Handle both raw string tokens and JSON stringified tokens
@@ -686,20 +676,8 @@ app.post("/api/billing/checkout", async (c) => {
     ? (process.env.STRIPE_PRICE_PRO || "price_1TUBthLwz6z5MtpXjNGJrIDE")
     : (process.env.STRIPE_PRICE_BUSINESS || "price_1TUBtgLwz6z5MtpXjA2f7bG4");
 
-  // Get user from cookie
-  const authHeader = c.req.header("Authorization");
-  const token = authHeader ? authHeader.replace("Bearer ", "") : c.req.cookie?.("auth_token") || "";
-  let userId = 0;
-  if (token) {
-    try {
-      const parts = token.split(".");
-      if (parts.length >= 2) {
-        const payload = JSON.parse(Buffer.from(parts[1], "base64").toString());
-        userId = payload.id || 0;
-      }
-    } catch {}
-  }
-
+  // Get user from auth
+  const userId = getCurrentUserId(c);
   if (!userId) return c.json({ error: "Not authenticated" }, 401);
 
   try {
@@ -784,29 +762,37 @@ app.get("/api/debug/env", (c) => {
 });
 
 app.get("/api/accounts", (c) => {
-  const accounts = db.query(`SELECT id, platform, username, profile_image, is_active, created_at FROM accounts WHERE user_id = ? ORDER BY platform`).all(DEMO_USER_ID);
+  const userId = getCurrentUserId(c);
+  if (!userId) return c.json({ error: "Not authenticated" }, 401);
+  const accounts = db.query(`SELECT id, platform, username, profile_image, is_active, created_at FROM accounts WHERE user_id = ? ORDER BY platform`).all(userId);
   return c.json({ accounts });
 });
 
 app.post("/api/accounts", async (c) => {
+  const userId = getCurrentUserId(c);
+  if (!userId) return c.json({ error: "Not authenticated" }, 401);
   const { platform, username } = await c.req.json();
-  const existing = db.query("SELECT id FROM accounts WHERE user_id = ? AND platform = ?").get(DEMO_USER_ID, platform);
+  const existing = db.query("SELECT id FROM accounts WHERE user_id = ? AND platform = ?").get(userId, platform);
   if (existing) return c.json({ error: `${platform} account already connected` }, 400);
-  db.run("INSERT INTO accounts (user_id, platform, username) VALUES (?, ?, ?)", [DEMO_USER_ID, platform, username]);
+  db.run("INSERT INTO accounts (user_id, platform, username) VALUES (?, ?, ?)", [userId, platform, username]);
   const account = db.query("SELECT * FROM accounts WHERE id = last_insert_rowid()").get();
   return c.json({ account }, 201);
 });
 
 app.delete("/api/accounts/:id", (c) => {
-  db.run("DELETE FROM accounts WHERE id = ? AND user_id = ?", parseInt(c.req.param("id")), DEMO_USER_ID);
+  const userId = getCurrentUserId(c);
+  if (!userId) return c.json({ error: "Not authenticated" }, 401);
+  db.run("DELETE FROM accounts WHERE id = ? AND user_id = ?", parseInt(c.req.param("id")), userId);
   return c.json({ success: true });
 });
 
 app.get("/api/posts", (c) => {
+  const userId = getCurrentUserId(c);
+  if (!userId) return c.json({ error: "Not authenticated" }, 401);
   const status = c.req.query("status");
   const platform = c.req.query("platform");
   let query = "SELECT * FROM posts WHERE user_id = ?";
-  const params: any[] = [DEMO_USER_ID];
+  const params: any[] = [userId];
   if (status) { query += " AND status = ?"; params.push(status); }
   if (platform) { query += " AND platforms LIKE ?"; params.push(`%${platform}%`); }
   query += " ORDER BY created_at DESC";
@@ -814,24 +800,30 @@ app.get("/api/posts", (c) => {
 });
 
 app.get("/api/posts/:id", (c) => {
-  const post = db.query("SELECT * FROM posts WHERE id = ? AND user_id = ?").get(parseInt(c.req.param("id")), DEMO_USER_ID);
+  const userId = getCurrentUserId(c);
+  if (!userId) return c.json({ error: "Not authenticated" }, 401);
+  const post = db.query("SELECT * FROM posts WHERE id = ? AND user_id = ?").get(parseInt(c.req.param("id")), userId);
   if (!post) return c.json({ error: "Post not found" }, 404);
   return c.json({ post });
 });
 
 app.post("/api/posts", async (c) => {
+  const userId = getCurrentUserId(c);
+  if (!userId) return c.json({ error: "Not authenticated" }, 401);
   const { content, media_urls, platforms, scheduled_at } = await c.req.json();
   if (!content || !platforms) return c.json({ error: "Content and platforms are required" }, 400);
   db.run("INSERT INTO posts (user_id, content, media_urls, platforms, scheduled_at, status) VALUES (?, ?, ?, ?, ?, ?)",
-    [DEMO_USER_ID, content, JSON.stringify(media_urls || []), platforms, scheduled_at || null, scheduled_at ? "scheduled" : "draft"]);
+    [userId, content, JSON.stringify(media_urls || []), platforms, scheduled_at || null, scheduled_at ? "scheduled" : "draft"]);
   const post = db.query("SELECT * FROM posts WHERE id = last_insert_rowid()").get();
   return c.json({ post }, 201);
 });
 
 app.put("/api/posts/:id", async (c) => {
+  const userId = getCurrentUserId(c);
+  if (!userId) return c.json({ error: "Not authenticated" }, 401);
   const id = parseInt(c.req.param("id"));
   const { content, media_urls, platforms, scheduled_at, status } = await c.req.json();
-  const existing = db.query("SELECT id FROM posts WHERE id = ? AND user_id = ?").get(id, DEMO_USER_ID);
+  const existing = db.query("SELECT id FROM posts WHERE id = ? AND user_id = ?").get(id, userId);
   if (!existing) return c.json({ error: "Post not found" }, 404);
   const updates: string[] = []; const params: any[] = [];
   if (content !== undefined) { updates.push("content = ?"); params.push(content); }
@@ -840,23 +832,27 @@ app.put("/api/posts/:id", async (c) => {
   if (scheduled_at !== undefined) { updates.push("scheduled_at = ?"); params.push(scheduled_at); }
   if (status !== undefined) { updates.push("status = ?"); params.push(status); }
   if (updates.length === 0) return c.json({ error: "No fields to update" }, 400);
-  params.push(id, DEMO_USER_ID);
+  params.push(id, userId);
   db.run(`UPDATE posts SET ${updates.join(", ")} WHERE id = ? AND user_id = ?`, ...params);
   const post = db.query("SELECT * FROM posts WHERE id = ?").get(id);
   return c.json({ post });
 });
 
 app.delete("/api/posts/:id", (c) => {
-  db.run("DELETE FROM posts WHERE id = ? AND user_id = ?", parseInt(c.req.param("id")), DEMO_USER_ID);
+  const userId = getCurrentUserId(c);
+  if (!userId) return c.json({ error: "Not authenticated" }, 401);
+  db.run("DELETE FROM posts WHERE id = ? AND user_id = ?", parseInt(c.req.param("id")), userId);
   return c.json({ success: true });
 });
 
 app.post("/api/posts/:id/publish", async (c) => {
+  const userId = getCurrentUserId(c);
+  if (!userId) return c.json({ error: "Not authenticated" }, 401);
   const id = parseInt(c.req.param("id"));
-  const post = db.query("SELECT * FROM posts WHERE id = ? AND user_id = ?").get(id, DEMO_USER_ID) as any;
+  const post = db.query("SELECT * FROM posts WHERE id = ? AND user_id = ?").get(id, userId) as any;
   if (!post) return c.json({ error: "Post not found" }, 404);
 
-  const ytAccount = db.query("SELECT * FROM accounts WHERE user_id = ? AND platform = 'youtube' AND is_active = 1").get(DEMO_USER_ID) as any;
+  const ytAccount = db.query("SELECT * FROM accounts WHERE user_id = ? AND platform = 'youtube' AND is_active = 1").get(userId) as any;
 
   // If we have a YouTube token, try to post as community update (works with just text)
   if (ytAccount?.access_token) {
@@ -895,6 +891,8 @@ app.post("/api/posts/:id/publish", async (c) => {
 });
 
 app.get("/api/analytics", (c) => {
+  const userId = getCurrentUserId(c);
+  if (!userId) return c.json({ error: "Not authenticated" }, 401);
   const platform = c.req.query("platform");
   const period = c.req.query("period") || "30d";
   let dateFilter = "datetime('now', '-30 days')";
@@ -902,17 +900,19 @@ app.get("/api/analytics", (c) => {
   else if (period === "90d") dateFilter = "datetime('now', '-90 days')";
   else if (period === "all") dateFilter = "datetime('now', '-1 year')";
   let query = `SELECT a.*, p.content, p.platforms, p.published_at FROM analytics a JOIN posts p ON a.post_id = p.id WHERE p.user_id = ? AND p.published_at >= ${dateFilter}`;
-  const params: any[] = [DEMO_USER_ID];
+  const params: any[] = [userId];
   if (platform) { query += " AND a.platform = ?"; params.push(platform); }
   const analytics = db.query(query + " ORDER BY a.fetched_at DESC").all(...params);
-  const totals = db.query(`SELECT platform, SUM(views) as views, SUM(likes) as likes, SUM(comments) as comments, SUM(shares) as shares, SUM(reach) as reach, SUM(impressions) as impressions FROM analytics a JOIN posts p ON a.post_id = p.id WHERE p.user_id = ? AND p.published_at >= ${dateFilter} GROUP BY platform`).all(DEMO_USER_ID);
+  const totals = db.query(`SELECT platform, SUM(views) as views, SUM(likes) as likes, SUM(comments) as comments, SUM(shares) as shares, SUM(reach) as reach, SUM(impressions) as impressions FROM analytics a JOIN posts p ON a.post_id = p.id WHERE p.user_id = ? AND p.published_at >= ${dateFilter} GROUP BY platform`).all(userId);
   return c.json({ analytics, totals });
 });
 
 app.get("/api/calendar", (c) => {
+  const userId = getCurrentUserId(c);
+  if (!userId) return c.json({ error: "Not authenticated" }, 401);
   const month = c.req.query("month");
   let query = "SELECT id, content, platforms, status, scheduled_at, published_at FROM posts WHERE user_id = ? AND (status = 'scheduled' OR status = 'published')";
-  const params: any[] = [DEMO_USER_ID];
+  const params: any[] = [userId];
   if (month) { query += " AND (scheduled_at LIKE ? OR published_at LIKE ?)"; params.push(`${month}%`, `${month}%`); }
   return c.json({ posts: db.query(query + " ORDER BY scheduled_at ASC").all(...params) });
 });
@@ -975,7 +975,7 @@ app.post("/api/settings/change-password", async (c) => {
   if (!currentPassword || !newPassword) return c.json({ error: "All fields required" }, 400);
 
   const authHeader = c.req.header("authorization") || "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : c.req.cookie("auth_token");
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
   let userId = 0;
   if (token) {
     try {

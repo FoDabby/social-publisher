@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { apiFetch } from "@/lib/api";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface CalendarPost {
@@ -17,7 +18,7 @@ export default function Calendar() {
 
   useEffect(() => {
     const month = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}`;
-    fetch(`/api/calendar?month=${month}`)
+    apiFetch(`/api/calendar?month=${month}`)
       .then((res) => res.json())
       .then((data) => setPosts(data.posts || []));
   }, [currentDate]);

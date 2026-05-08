@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { apiFetch } from "@/lib/api";
 import { Video, Calendar, Clock, ExternalLink, TrendingUp, ChevronRight, RefreshCw, AlertCircle, Trash2 } from "lucide-react";
 
 interface YouTubeVideo {
@@ -47,8 +48,8 @@ export default function YouTubeVideos() {
     setError("");
     try {
       const [videosRes, analyticsRes] = await Promise.all([
-        fetch("/api/youtube/videos"),
-        fetch("/api/youtube/analytics"),
+        apiFetch("/api/youtube/videos"),
+        apiFetch("/api/youtube/analytics"),
       ]);
 
       const videosData = await videosRes.json();
@@ -78,7 +79,7 @@ export default function YouTubeVideos() {
 
   async function fetchPosts() {
     try {
-      const res = await fetch("/api/posts?platform=youtube");
+      const res = await apiFetch("/api/posts?platform=youtube");
       const data = await res.json();
       setPosts(data.posts || []);
     } catch (err) {
@@ -99,7 +100,7 @@ export default function YouTubeVideos() {
     const scheduled_at = `${scheduleForm.day}T${scheduleForm.time}:00`;
 
     // Create a new post for this video
-    const response = await fetch("/api/posts", {
+    const response = await apiFetch("/api/posts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -138,7 +139,7 @@ export default function YouTubeVideos() {
 
   async function handleDeletePost(id: number) {
     if (!confirm("Remove this video from the schedule?")) return;
-    await fetch(`/api/posts/${id}`, { method: "DELETE" });
+    await apiFetch(`/api/posts/${id}`, { method: "DELETE" });
     fetchPosts();
   }
 

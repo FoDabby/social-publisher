@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { apiFetch } from "@/lib/api";
 import { Eye, Heart, MessageSquare, Share2, TrendingUp, BarChart3 } from "lucide-react";
 
 interface AnalyticsData {
@@ -33,7 +34,7 @@ export default function Analytics() {
   useEffect(() => {
     const params = new URLSearchParams({ period });
     if (platform !== "all") params.append("platform", platform);
-    fetch(`/api/analytics?${params}`)
+    apiFetch(`/api/analytics?${params}`)
       .then((res) => res.json())
       .then((data) => setData(data));
   }, [period, platform]);

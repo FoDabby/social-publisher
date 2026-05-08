@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { apiFetch } from "@/lib/api";
 import { Plus, Edit2, Trash2, Send, Clock, X, Menu, Upload, Image, Film } from "lucide-react";
 
 interface Post {
@@ -31,7 +32,7 @@ export default function Posts() {
   }, []);
 
   async function fetchPosts() {
-    const res = await fetch("/api/posts");
+    const res = await apiFetch("/api/posts");
     const data = await res.json();
     setPosts(data.posts || []);
   }
@@ -71,13 +72,13 @@ export default function Posts() {
     };
 
     if (editingPost) {
-      await fetch(`/api/posts/${editingPost.id}`, {
+      await apiFetch(`/api/posts/${editingPost.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
     } else {
-      await fetch("/api/posts", {
+      await apiFetch("/api/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -90,13 +91,13 @@ export default function Posts() {
 
   async function handleDelete(id: number) {
     if (!confirm("Delete this post?")) return;
-    await fetch(`/api/posts/${id}`, { method: "DELETE" });
+    await apiFetch(`/api/posts/${id}`, { method: "DELETE" });
     fetchPosts();
   }
 
   async function handlePublish(post: Post) {
     if (!confirm(`Publish this post to ${post.platforms}?`)) return;
-    await fetch(`/api/posts/${post.id}/publish`, { method: "POST" });
+    await apiFetch(`/api/posts/${post.id}/publish`, { method: "POST" });
     fetchPosts();
   }
 
@@ -109,7 +110,7 @@ export default function Posts() {
       for (const file of files) {
         const fd = new FormData();
         fd.append("file", file);
-        const res = await fetch("/api/media/upload", { method: "POST", body: fd });
+        const res = await apiFetch("/api/media/upload", { method: "POST", body: fd });
         const data = await res.json();
         if (data.url) uploaded.push(data.url);
       }
