@@ -515,11 +515,21 @@ function verifyPassword(password: string, hash: string): boolean {
 }
 
 function getCurrentUserId(c: any): number | null {
+  // Try Authorization header first (API clients, fetch with Bearer token)
   const auth = c.req.header("Authorization");
-  if (!auth?.startsWith("Bearer ")) return null;
-  const token = auth.slice(7);
-  const decoded = verifyToken(token);
-  return decoded?.userId || null;
+  if (auth?.startsWith("Bearer ")) {
+    const token = auth.slice(7);
+    const decoded = verifyToken(token);
+    if (decoded?.userId) return decoded.userId;
+  }
+  // Fall back to cookie (browser auto-includes cookies)
+  const cookies = c.req.header("cookie") || "";
+  const match = cookies.match(/auth_token=([^;]+)/);
+  if (match) {
+    const decoded = verifyToken(match[1]);
+    return decoded?.userId || null;
+  }
+  return null;
 }
 
 function getTierLimits(plan: string) {

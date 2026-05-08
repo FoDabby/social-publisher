@@ -85,7 +85,7 @@ export default function Landing() {
             <div className="flex items-center gap-2 mb-3">
               <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-500"></div>
               <div>
-                <p className="font-semibold text-sm">@yourbrand</p>
+                <p className="font-semibold text-sm text-gray-900">@yourbrand</p>
                 <p className="text-xs text-gray-500">Just posted</p>
               </div>
               <Instagram className="h-5 w-5 text-pink-500 ml-auto" />
@@ -93,7 +93,7 @@ export default function Landing() {
             <div className="aspect-square bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 rounded-xl mb-3 flex items-center justify-center">
               <Sparkles className="h-16 w-16 text-white" />
             </div>
-            <p className="text-sm">✨ Big news coming this week! Stay tuned 👀</p>
+            <p className="text-sm text-gray-700">✨ Big news coming this week! Stay tuned 👀</p>
             <div className="flex items-center gap-3 mt-3 text-xs text-gray-500">
               <span>♥ 2.4k</span>
               <span>💬 156</span>
@@ -107,7 +107,7 @@ export default function Landing() {
                 <Youtube className="h-6 w-6 text-white" />
               </div>
               <div>
-                <p className="font-semibold text-sm">Your Channel</p>
+                <p className="font-semibold text-sm text-gray-900">Your Channel</p>
                 <p className="text-xs text-gray-500">Scheduled</p>
               </div>
             </div>
@@ -117,7 +117,7 @@ export default function Landing() {
               </div>
               <span className="absolute bottom-2 right-2 text-xs text-white bg-black/50 px-2 py-0.5 rounded">8:42</span>
             </div>
-            <p className="text-sm font-semibold">5 AI Tools That Will Save You Hours</p>
+            <p className="text-sm font-semibold text-gray-900">5 AI Tools That Will Save You Hours</p>
             <p className="text-xs text-gray-500 mt-1">Posts Tuesday at 6:00 PM</p>
           </div>
 
@@ -127,7 +127,7 @@ export default function Landing() {
                 <Music className="h-5 w-5 text-white" />
               </div>
               <div>
-                <p className="font-semibold text-sm">@yourtok</p>
+                <p className="font-semibold text-sm text-gray-900">@yourtok</p>
                 <p className="text-xs text-gray-500">Trending now</p>
               </div>
             </div>
@@ -155,24 +155,24 @@ export default function Landing() {
               <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mb-4">
                 <Calendar className="h-7 w-7 text-white" />
               </div>
-              <h3 className="text-xl font-bold mb-2">Smart Scheduling</h3>
-              <p className="text-gray-600">AI suggests optimal times to post based on your audience activity. Wake up to engagement.</p>
+              <h3 className="text-xl font-bold mb-2 text-gray-900">Smart Scheduling</h3>
+              <p className="text-gray-700">AI suggests optimal times to post based on your audience activity. Wake up to engagement.</p>
             </div>
 
             <div className="p-8 bg-gradient-to-br from-orange-50 to-pink-50 rounded-3xl border border-orange-100">
               <div className="w-14 h-14 bg-gradient-to-br from-orange-500 to-pink-500 rounded-2xl flex items-center justify-center mb-4">
                 <Zap className="h-7 w-7 text-white" />
               </div>
-              <h3 className="text-xl font-bold mb-2">One-Click Multi-Post</h3>
-              <p className="text-gray-600">Post to YouTube, Instagram, and TikTok simultaneously. One click. Three platforms. Zero copy-paste.</p>
+              <h3 className="text-xl font-bold mb-2 text-gray-900">One-Click Multi-Post</h3>
+              <p className="text-gray-700">Post to YouTube, Instagram, and TikTok simultaneously. One click. Three platforms. Zero copy-paste.</p>
             </div>
 
             <div className="p-8 bg-gradient-to-br from-cyan-50 to-blue-50 rounded-3xl border border-cyan-100">
               <div className="w-14 h-14 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-2xl flex items-center justify-center mb-4">
                 <BarChart3 className="h-7 w-7 text-white" />
               </div>
-              <h3 className="text-xl font-bold mb-2">Real Analytics</h3>
-              <p className="text-gray-600">Track views, engagement, and growth across every platform. Know what's working and double down.</p>
+              <h3 className="text-xl font-bold mb-2 text-gray-900">Real Analytics</h3>
+              <p className="text-gray-700">Track views, engagement, and growth across every platform. Know what's working and double down.</p>
             </div>
           </div>
         </div>
