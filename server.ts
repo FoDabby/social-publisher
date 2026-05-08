@@ -102,7 +102,7 @@ const YOUTUBE_CLIENT_SECRET = process.env.YOUTUBE_CLIENT_SECRET || "";
 const YOUTUBE_REDIRECT_URI = mode === "production"
   ? "https://reelaura.online/api/auth/youtube/callback"
   : "http://localhost:53890/api/auth/youtube/callback";
-const SCOPES = "https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email";
+const SCOPES = "https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email";
 
 // ===== YOUTUBE OAUTH =====
 
