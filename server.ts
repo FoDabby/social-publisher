@@ -100,7 +100,7 @@ if (!existingUser) {
 const YOUTUBE_CLIENT_ID = process.env.YOUTUBE_CLIENT_ID || "";
 const YOUTUBE_CLIENT_SECRET = process.env.YOUTUBE_CLIENT_SECRET || "";
 const YOUTUBE_REDIRECT_URI = mode === "production"
-  ? "https://social-publisher-mshor1216.zocomputer.io/api/auth/youtube/callback"
+  ? "https://reelaura.online/api/auth/youtube/callback"
   : "http://localhost:53890/api/auth/youtube/callback";
 const SCOPES = "https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email";
 
@@ -257,9 +257,11 @@ app.get("/api/youtube/videos", async (c) => {
     });
     
     if (!channelRes.ok) {
-      const err = await channelRes.text();
-      console.error("Channel fetch error:", err);
-      return c.json({ error: "Failed to fetch channel" }, 400);
+      const errData = await channelRes.json().catch(() => ({})) as any;
+      const reason = errData?.error?.errors?.[0]?.reason;
+      if (reason === "quotaExceeded") return c.json({ error: "YouTube API quota exceeded for today. Try again after midnight Pacific time.", quotaExceeded: true }, 429);
+      console.error("Channel fetch error:", errData);
+      return c.json({ error: errData?.error?.message || "Failed to fetch channel" }, 400);
     }
     
     const channelData = await channelRes.json();
@@ -535,6 +537,7 @@ app.post("/api/auth/signup", async (c) => {
   db.run("INSERT INTO users (email, password_hash, name, plan, role) VALUES (?, ?, ?, 'free', 'user')", [email, password_hash, name]);
   const user = db.query("SELECT id, email, name, plan, role FROM users WHERE email = ?").get(email) as any;
   const token = generateToken(user.id, user.role);
+  c.header("Set-Cookie", `auth_token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800`);
   return c.json({ user: { id: user.id, email: user.email, name: user.name, plan: user.plan }, token }, 201);
 });
 
@@ -544,6 +547,7 @@ app.post("/api/auth/login", async (c) => {
   const user = db.query("SELECT * FROM users WHERE email = ?").get(email) as any;
   if (!user || !verifyPassword(password, user.password_hash || "")) return c.json({ error: "Invalid credentials" }, 401);
   const token = generateToken(user.id, user.role);
+  c.header("Set-Cookie", `auth_token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800`);
   return c.json({ user: { id: user.id, email: user.email, name: user.name, plan: user.plan, role: user.role }, token });
 });
 

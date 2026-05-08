@@ -60,6 +60,8 @@ export default function YouTubeVideos() {
       if (!videosRes.ok) {
         if (videosData.notConnected || videosRes.status === 403) {
           setNotConnected(true);
+        } else if (videosRes.status === 429 || videosData.quotaExceeded) {
+          setError(videosData.error || "YouTube API quota exceeded. Try again after midnight Pacific time.");
         } else {
           setError(videosData.error || "Failed to load YouTube videos");
         }
