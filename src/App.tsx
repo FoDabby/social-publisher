@@ -8,6 +8,7 @@ import Accounts from "./pages/Accounts";
 import YouTubeVideos from "./pages/YouTubeVideos";
 import Auth from "./pages/Auth";
 import Billing from "./pages/Billing";
+import Settings from "./pages/Settings";
 import Sidebar from "./components/Sidebar";
 import Landing from "./pages/Landing";
 
@@ -36,6 +37,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/auth" element={<Auth />} />
+          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="/billing" element={<Billing />} />
           <Route path="/" element={<Landing />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

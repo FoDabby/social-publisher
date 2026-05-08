@@ -967,4 +967,33 @@ async function configureDevelopment(app: Hono): Promise<ViteDevServer> {
     }
   });
   return vite;
+
+
+// ===== CHANGE PASSWORD =====
+app.post("/api/settings/change-password", async (c) => {
+  const { currentPassword, newPassword } = await c.req.json();
+  if (!currentPassword || !newPassword) return c.json({ error: "All fields required" }, 400);
+
+  const authHeader = c.req.header("authorization") || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : c.req.cookie("auth_token");
+  let userId = 0;
+  if (token) {
+    try {
+      const parts = token.split(".");
+      if (parts.length >= 2) {
+        const payload = JSON.parse(Buffer.from(parts[1], "base64").toString());
+        userId = payload.id || 0;
+      }
+    } catch {}
+  }
+  if (!userId) return c.json({ error: "Not authenticated" }, 401);
+
+  const user = db.query("SELECT * FROM users WHERE id = ?").get(userId) as any;
+  if (!user) return c.json({ error: "User not found" }, 404);
+
+  const [hashed] = await Promise.resolve().then(() => require("bcryptjs").hash(newPassword, 10));
+  db.run("UPDATE users SET password_hash = ? WHERE id = ?", [hashed, userId]);
+  return c.json({ success: true });
+});
+
 }
