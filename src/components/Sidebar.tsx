@@ -10,7 +10,7 @@ interface User {
 }
 
 const navItems = [
-  { path: "/", label: "Dashboard", icon: BarChart3 },
+  { path: "/dashboard", label: "Dashboard", icon: BarChart3 },
   { path: "/posts", label: "Posts", icon: FileText },
   { path: "/calendar", label: "Calendar", icon: Calendar },
   { path: "/analytics", label: "Analytics", icon: TrendingUp },

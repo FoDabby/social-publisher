@@ -32,7 +32,7 @@ export default function Auth() {
       } else {
         localStorage.setItem("token", data.token);
         localStorage.setItem("user", JSON.stringify(data.user));
-        window.location.href = "/";
+        window.location.href = "/dashboard";
       }
     } catch {
       setError("Network error. Try again.");

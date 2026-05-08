@@ -206,22 +206,24 @@ export default function Billing() {
       )}
 
       {/* Stripe Setup Instructions */}
-      <div className="bg-muted/50 border border-dashed rounded-xl p-6">
-        <h2 className="font-semibold mb-2">Stripe Setup Required</h2>
-        <p className="text-sm text-muted-foreground">
-          To enable payments, you need to set up Stripe. The Pro plan is $19/mo and Business is $49/mo.
-        </p>
-        <div className="mt-4 text-sm space-y-1">
-          <p><strong>Steps to set up:</strong></p>
-          <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-            <li>Create a Stripe account at <span className="text-primary">dashboard.stripe.com</span></li>
-            <li>Create 3 products in Stripe: "Pro Plan - $19/mo" and "Business Plan - $49/mo"</li>
-            <li>Get the Price IDs and add them as <code className="bg-muted px-1 rounded">STRIPE_PRICE_PRO</code> and <code className="bg-muted px-1 rounded">STRIPE_PRICE_BUSINESS</code> in your secrets</li>
-            <li>Add your Stripe keys as <code className="bg-muted px-1 rounded">STRIPE_SECRET_KEY</code> and <code className="bg-muted px-1 rounded">STRIPE_WEBHOOK_SECRET</code></li>
-            <li>Set webhook URL to: <code className="bg-muted px-1 rounded">https://social-publisher-mshor1216.zocomputer.io/api/billing/webhook</code></li>
-          </ol>
+      {user?.role === "admin" && (
+        <div className="bg-muted/50 border border-dashed rounded-xl p-6">
+          <h2 className="font-semibold mb-2">Stripe Setup Required</h2>
+          <p className="text-sm text-muted-foreground">
+            To enable payments, you need to set up Stripe. The Pro plan is $19/mo and Business is $49/mo.
+          </p>
+          <div className="mt-4 text-sm space-y-1">
+            <p><strong>Steps to set up:</strong></p>
+            <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+              <li>Create a Stripe account at <span className="text-primary">dashboard.stripe.com</span></li>
+              <li>Create 3 products in Stripe: "Pro Plan - $19/mo" and "Business Plan - $49/mo"</li>
+              <li>Get the Price IDs and add them as <code className="bg-muted px-1 rounded">STRIPE_PRICE_PRO</code> and <code className="bg-muted px-1 rounded">STRIPE_PRICE_BUSINESS</code> in your secrets</li>
+              <li>Add your Stripe keys as <code className="bg-muted px-1 rounded">STRIPE_SECRET_KEY</code> and <code className="bg-muted px-1 rounded">STRIPE_WEBHOOK_SECRET</code></li>
+              <li>Set webhook URL to: <code className="bg-muted px-1 rounded">https://social-publisher-mshor1216.zocomputer.io/api/billing/webhook</code></li>
+            </ol>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -9,6 +9,7 @@ import YouTubeVideos from "./pages/YouTubeVideos";
 import Auth from "./pages/Auth";
 import Billing from "./pages/Billing";
 import Sidebar from "./components/Sidebar";
+import Landing from "./pages/Landing";
 
 function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -36,7 +37,8 @@ export default function App() {
         <Routes>
           <Route path="/auth" element={<Auth />} />
           <Route path="/billing" element={<Billing />} />
-          <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/" element={<Landing />} />
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/posts" element={<ProtectedRoute><Posts /></ProtectedRoute>} />
           <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
           <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
