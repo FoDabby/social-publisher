@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { LayoutDashboard, FileText, Calendar, TrendingUp, Users, Video, Wand2, Settings, CreditCard, LogOut, Sparkles } from "lucide-react";
+import { LayoutDashboard, FileText, Calendar, TrendingUp, Users, Video, Wand2, Settings, CreditCard, LogOut, Sparkles, Instagram, Music2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface User {
@@ -16,6 +16,8 @@ const navItems = [
   { path: "/calendar", label: "Calendar", icon: Calendar },
   { path: "/analytics", label: "Analytics", icon: TrendingUp },
   { path: "/youtube-videos", label: "YouTube", icon: Video },
+  { path: "/instagram", label: "Instagram", icon: Instagram },
+  { path: "/tiktok", label: "TikTok", icon: Music2 },
   { path: "/accounts", label: "Accounts", icon: Users },
   { path: "/billing", label: "Billing", icon: CreditCard },
   { path: "/settings", label: "Settings", icon: Settings },

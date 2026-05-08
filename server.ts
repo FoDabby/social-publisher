@@ -248,7 +248,7 @@ app.get("/api/youtube/videos", async (c) => {
   const userId = getCurrentUserId(c);
   if (!userId) return c.json({ error: "Not authenticated" }, 401);
   const accessToken = await getValidYouTubeToken(userId);
-  if (!accessToken) return c.json({ error: "No YouTube access" }, 401);
+  if (!accessToken) return c.json({ error: "YouTube account not connected", notConnected: true }, 403);
 
   try {
     // Get uploads playlist from channel
@@ -322,7 +322,7 @@ app.post("/api/youtube/upload", async (c) => {
   const userId = getCurrentUserId(c);
   if (!userId) return c.json({ error: "Not authenticated" }, 401);
   const account = db.query("SELECT access_token FROM accounts WHERE user_id = ? AND platform = 'youtube'").get(userId) as any;
-  if (!account?.access_token) return c.json({ error: "YouTube not connected" }, 400);
+  if (!account?.access_token) return c.json({ error: "YouTube not connected", notConnected: true }, 403);
 
   // Handle both raw string tokens and JSON stringified tokens
   const rawToken = account.access_token;
@@ -333,7 +333,7 @@ app.post("/api/youtube/upload", async (c) => {
     const token = JSON.parse(rawToken);
     accessToken = token.access_token;
     if (token.expiry_date && Date.now() > token.expiry_date) {
-      return c.json({ error: "YouTube token expired. Please reconnect.", expired: true }, 401);
+      return c.json({ error: "YouTube token expired. Please reconnect.", expired: true, notConnected: true }, 403);
     }
   }
 
@@ -384,7 +384,7 @@ app.get("/api/youtube/analytics", async (c) => {
   const userId = getCurrentUserId(c);
   if (!userId) return c.json({ error: "Not authenticated" }, 401);
   const account = db.query("SELECT access_token FROM accounts WHERE user_id = ? AND platform = 'youtube'").get(userId) as any;
-  if (!account?.access_token) return c.json({ error: "YouTube not connected" }, 400);
+  if (!account?.access_token) return c.json({ error: "YouTube not connected", notConnected: true }, 403);
 
   // Handle both raw string tokens and JSON stringified tokens
   const rawToken = account.access_token;
@@ -395,7 +395,7 @@ app.get("/api/youtube/analytics", async (c) => {
     const token = JSON.parse(rawToken);
     accessToken = token.access_token;
     if (token.expiry_date && Date.now() > token.expiry_date) {
-      return c.json({ error: "YouTube token expired. Please reconnect.", expired: true }, 401);
+      return c.json({ error: "YouTube token expired. Please reconnect.", expired: true, notConnected: true }, 403);
     }
   }
 
@@ -917,6 +917,26 @@ app.get("/api/calendar", (c) => {
   return c.json({ posts: db.query(query + " ORDER BY scheduled_at ASC").all(...params) });
 });
 
+// ===== CHANGE PASSWORD =====
+app.post("/api/settings/change-password", async (c) => {
+  const userId = getCurrentUserId(c);
+  if (!userId) return c.json({ error: "Not authenticated" }, 401);
+
+  const { currentPassword, newPassword } = await c.req.json();
+  if (!currentPassword || !newPassword) return c.json({ error: "All fields required" }, 400);
+
+  const user = db.query("SELECT * FROM users WHERE id = ?").get(userId) as any;
+  if (!user) return c.json({ error: "User not found" }, 404);
+
+  if (!verifyPassword(currentPassword, user.password_hash)) {
+    return c.json({ error: "Current password is incorrect" }, 400);
+  }
+
+  const hashed = hashPassword(newPassword);
+  db.run("UPDATE users SET password_hash = ? WHERE id = ?", [hashed, userId]);
+  return c.json({ success: true });
+});
+
 // Development / Production config
 if (mode === "production") {
   configureProduction(app);
@@ -967,33 +987,4 @@ async function configureDevelopment(app: Hono): Promise<ViteDevServer> {
     }
   });
   return vite;
-
-
-// ===== CHANGE PASSWORD =====
-app.post("/api/settings/change-password", async (c) => {
-  const { currentPassword, newPassword } = await c.req.json();
-  if (!currentPassword || !newPassword) return c.json({ error: "All fields required" }, 400);
-
-  const authHeader = c.req.header("authorization") || "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  let userId = 0;
-  if (token) {
-    try {
-      const parts = token.split(".");
-      if (parts.length >= 2) {
-        const payload = JSON.parse(Buffer.from(parts[1], "base64").toString());
-        userId = payload.id || 0;
-      }
-    } catch {}
-  }
-  if (!userId) return c.json({ error: "Not authenticated" }, 401);
-
-  const user = db.query("SELECT * FROM users WHERE id = ?").get(userId) as any;
-  if (!user) return c.json({ error: "User not found" }, 404);
-
-  const [hashed] = await Promise.resolve().then(() => require("bcryptjs").hash(newPassword, 10));
-  db.run("UPDATE users SET password_hash = ? WHERE id = ?", [hashed, userId]);
-  return c.json({ success: true });
-});
-
 }

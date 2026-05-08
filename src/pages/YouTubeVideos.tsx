@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { apiFetch } from "@/lib/api";
-import { Video, Calendar, Clock, ExternalLink, TrendingUp, ChevronRight, RefreshCw, AlertCircle, Trash2 } from "lucide-react";
+import { Video, Calendar, Clock, ExternalLink, TrendingUp, ChevronRight, RefreshCw, AlertCircle, Trash2, Link } from "lucide-react";
 
 interface YouTubeVideo {
   id: string;
@@ -31,6 +31,7 @@ export default function YouTubeVideos() {
   const [videos, setVideos] = useState<YouTubeVideo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [notConnected, setNotConnected] = useState(false);
   const [channel, setChannel] = useState<ChannelStats | null>(null);
   const [bestTimes, setBestTimes] = useState<BestTime[]>([]);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -46,6 +47,7 @@ export default function YouTubeVideos() {
   async function fetchYouTubeData() {
     setLoading(true);
     setError("");
+    setNotConnected(false);
     try {
       const [videosRes, analyticsRes] = await Promise.all([
         apiFetch("/api/youtube/videos"),
@@ -56,8 +58,8 @@ export default function YouTubeVideos() {
       const analyticsData = await analyticsRes.json();
 
       if (!videosRes.ok) {
-        if (videosData.expired) {
-          setError("YouTube token expired. Please reconnect your account.");
+        if (videosData.notConnected || videosRes.status === 403) {
+          setNotConnected(true);
         } else {
           setError(videosData.error || "Failed to load YouTube videos");
         }
@@ -150,6 +152,29 @@ export default function YouTubeVideos() {
           <RefreshCw className="h-5 w-5 animate-spin" />
           <span>Loading your YouTube videos...</span>
         </div>
+      </div>
+    );
+  }
+
+  if (notConnected) {
+    return (
+      <div className="space-y-6 max-w-lg mx-auto mt-16 text-center">
+        <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center mx-auto">
+          <Video className="h-10 w-10 text-red-500" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold">Connect YouTube</h1>
+          <p className="text-muted-foreground mt-2">
+            Link your YouTube account to view your videos, check analytics, and schedule uploads.
+          </p>
+        </div>
+        <a
+          href="/api/auth/youtube"
+          className="inline-flex items-center gap-2 px-6 py-3 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition"
+        >
+          <Link className="h-4 w-4" />
+          Connect YouTube Account
+        </a>
       </div>
     );
   }

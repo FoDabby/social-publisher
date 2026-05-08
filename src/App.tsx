@@ -10,6 +10,8 @@ import Auth from "./pages/Auth";
 import Billing from "./pages/Billing";
 import Settings from "./pages/Settings";
 import Studio from "./pages/Studio";
+import Instagram from "./pages/Instagram";
+import TikTok from "./pages/TikTok";
 import Sidebar from "./components/Sidebar";
 import Landing from "./pages/Landing";
 
@@ -46,6 +48,8 @@ export default function App() {
           <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
           <Route path="/accounts" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
           <Route path="/youtube-videos" element={<ProtectedRoute><YouTubeVideos /></ProtectedRoute>} />
+          <Route path="/instagram" element={<ProtectedRoute><Instagram /></ProtectedRoute>} />
+          <Route path="/tiktok" element={<ProtectedRoute><TikTok /></ProtectedRoute>} />
           <Route path="/billing" element={<ProtectedRoute><Billing /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
         </Routes>
